@@ -37,8 +37,8 @@ if user_input:
             full_answer += "\n\n---\n**Sources:**\n"
             for doc in docs:
                 doc_link = f"[🔗]({doc['url']})" if doc["url"] else ""
-                summary = doc["content"][:500] + ("..." if len(doc["content"]) > 500 else "")
-                full_answer += f"- **{doc['title']}** ({doc['source']}) {doc_link}\n> {summary}\n\n"
+                full_answer += f"- **{doc['title']}** {doc_link}\n"
+
 
         st.markdown(full_answer)
         st.session_state.messages.append({"role": "assistant", "content": full_answer})
