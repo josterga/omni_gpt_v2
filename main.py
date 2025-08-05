@@ -1,30 +1,44 @@
 import streamlit as st
 from app_core import handle_user_query
 
-import sys
-import os
-print("\n".join(sys.path))
+import sys, os
 sys.path.insert(0, os.path.abspath("."))
 
 st.set_page_config(page_title="Omni Assistant", layout="wide")
+
 st.title("🤖 Omni Assistant")
-st.markdown("Ask a question based on internal documentation, Slack messages, or metrics.")
 
-query = st.text_input("Your question:")
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if query:
-    with st.spinner("Analyzing and searching..."):
-        answer, docs = handle_user_query(query)
+# Display chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    st.markdown("## ✅ Answer")
-    st.markdown(answer)
+# Chat input (anchored at bottom)
+user_input = st.chat_input("Ask something...")
 
-    if docs:
-        st.markdown("---")
-        st.markdown("## 📄 Source Highlights")
-        for doc in docs:
-            st.markdown(f"**{doc['title']}** ({doc['source']})")
-            if doc["url"]:
-                st.markdown(f"[🔗 Source Link]({doc['url']})")
-            st.markdown(f"> {doc['content'][:500]}{'...' if len(doc['content']) > 500 else ''}")
-            st.markdown("---")
+if user_input:
+    # Add user message
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    # Generate and display answer
+    with st.chat_message("assistant"):
+        with st.spinner("Analyzing and searching..."):
+            answer, docs = handle_user_query(user_input)
+
+        # Format answer with optional sources
+        full_answer = f"**Answer:**\n\n{answer}"
+        if docs:
+            full_answer += "\n\n---\n**Sources:**\n"
+            for doc in docs:
+                doc_link = f"[🔗]({doc['url']})" if doc["url"] else ""
+                summary = doc["content"][:500] + ("..." if len(doc["content"]) > 500 else "")
+                full_answer += f"- **{doc['title']}** ({doc['source']}) {doc_link}\n> {summary}\n\n"
+
+        st.markdown(full_answer)
+        st.session_state.messages.append({"role": "assistant", "content": full_answer})

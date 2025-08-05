@@ -1,6 +1,5 @@
 import os
 import sys
-print("\n".join(sys.path))
 sys.path.insert(0, os.path.abspath(".")) 
 import time
 import json
@@ -47,6 +46,7 @@ OMNI_API_KEY = os.getenv("OMNI_API_KEY")
 BASE_URL = os.getenv("BASE_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() in {"1", "true", "yes"}
+SLACK_TOKEN = os.getenv("SLACK_API_KEY")
 
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 if ENABLE_MCP:
@@ -64,7 +64,7 @@ if ENABLE_MCP:
 else:
     mcp_client = None
 
-slack_searcher = SlackSearcher(result_limit=5, thread_limit=5)
+slack_searcher = SlackSearcher(slack_token=SLACK_TOKEN, result_limit=5, thread_limit=5)
 
 ngram_config = {
     "strategy": "ngram",
@@ -153,7 +153,9 @@ def handle_user_query(query):
 
     slack_docs = []
     seen = set()
-    for ng in [ng for ng in ngrams if len(ng.split()) >= 2]:
+    slack_ngrams = ngrams.get("ngram") if isinstance(ngrams, dict) else ngrams
+
+    for ng in slack_ngrams:
         for res in slack_searcher.search(ng):
             text = res.get("text", "") if isinstance(res, dict) else res
             url = res.get("metadata", {}).get("permalink", "") if isinstance(res, dict) else ""
@@ -167,7 +169,7 @@ def handle_user_query(query):
                 "content": text,
                 "source": "slack"
             })
-
+    print(slack_docs)
     mcp_docs = []
     if ENABLE_MCP and is_metric_query(query):
         result = mcp_client.run_agentic_inference(query)
