@@ -1,0 +1,3 @@
+[submodule "applied_ai"]
+	path = applied_ai
+	url = https://github.com/josterga/applied-ai
