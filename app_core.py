@@ -1,0 +1,187 @@
+import os
+import sys
+print("\n".join(sys.path))
+sys.path.insert(0, os.path.abspath(".")) 
+import time
+import json
+import requests
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from applied_ai.generation.generation.router import get_llm
+from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExtractor
+from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
+from applied_ai.slack_search.slack_search.searcher import SlackSearcher
+from applied_ai.mcp_client.mcp_client.registry import MCPRegistry
+import openai
+
+
+load_dotenv()
+
+TYPESENSE_API_KEY = os.getenv('TYPESENSE_API_KEY')
+TYPESENSE_BASE_URL = os.getenv('TYPESENSE_BASE_URL')
+TYPESENSE_URL = f"https://{TYPESENSE_BASE_URL}-1.a1.typesense.net/multi_search?x-typesense-api-key={TYPESENSE_API_KEY}"
+TYPESENSE_HEADERS = {
+    "accept": "application/json, text/plain, */*",
+    "content-type": "text/plain"
+}
+TYPESENSE_SEARCH_BODY_TEMPLATE = {
+    "searches": [
+        {
+            "collection": "omni-docs",
+            "q": "",
+            "query_by": "hierarchy.lvl0,hierarchy.lvl1,hierarchy.lvl2,hierarchy.lvl3,hierarchy.lvl4,hierarchy.lvl5,hierarchy.lvl6,content",
+            "include_fields": "hierarchy.lvl0,hierarchy.lvl1,hierarchy.lvl2,hierarchy.lvl3,hierarchy.lvl4,hierarchy.lvl5,hierarchy.lvl6,content,anchor,url,type,id",
+            "highlight_full_fields": "hierarchy.lvl0,hierarchy.lvl1,hierarchy.lvl2,hierarchy.lvl3,hierarchy.lvl4,hierarchy.lvl5,hierarchy.lvl6,content",
+            "group_by": "url",
+            "group_limit": 3,
+            "sort_by": "item_priority:desc",
+            "snippet_threshold": 8,
+            "highlight_affix_num_tokens": 4,
+            "filter_by": ""
+        }
+    ]
+}
+
+OMNI_MODEL_ID = os.getenv("OMNI_MODEL_ID")
+OMNI_API_KEY = os.getenv("OMNI_API_KEY")
+BASE_URL = os.getenv("BASE_URL")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() in {"1", "true", "yes"}
+
+openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+if ENABLE_MCP:
+    registry = MCPRegistry()
+    mcp_client = registry.get_client(
+        "Omni",
+        openai_client=openai_client,
+        url=BASE_URL,
+        headers={
+            "Authorization": f"Bearer {OMNI_API_KEY}",
+            "Accept": "application/json, text/event-stream",
+            "X-MCP-MODEL-ID": OMNI_MODEL_ID
+        }
+    )
+else:
+    mcp_client = None
+
+slack_searcher = SlackSearcher(result_limit=5, thread_limit=5)
+
+ngram_config = {
+    "strategy": "ngram",
+    "ngram": {
+        "ngram_sizes": [1, 2, 3],
+        "stopwords": [
+            "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "as", "at",
+            "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "could", "did", "do",
+            "does", "doing", "down", "during", "each", "few", "for", "from", "further", "had", "has", "have", "having",
+            "he", "her", "here", "hers", "herself", "him", "himself", "his", "how", "i", "if", "in", "into", "is", "it",
+            "its", "itself", "just", "me", "more", "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on",
+            "once", "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should",
+            "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then", "there",
+            "these", "they", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "we",
+            "were", "what", "when", "where", "which", "while", "who", "whom", "why", "will", "with", "you", "your",
+            "yours", "yourself", "yourselves"
+        ]
+    }
+}
+
+def fetch_live_content(url, timeout=8):
+    try:
+        resp = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return soup.get_text(" ", strip=True)
+    except Exception:
+        return None
+
+def search_typesense_ngrams(ngrams, max_results=5):
+    docs, seen_urls = [], set()
+    ngram_list = ngrams.get("ngram") if isinstance(ngrams, dict) else ngrams
+    for ngram in ngram_list:
+        body = TYPESENSE_SEARCH_BODY_TEMPLATE.copy()
+        body["searches"][0] = body["searches"][0].copy()
+        body["searches"][0]["q"] = ngram
+        try:
+            resp = requests.post(TYPESENSE_URL, headers=TYPESENSE_HEADERS, data=json.dumps(body), timeout=8)
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+        except Exception:
+            continue
+        for group in results[0].get("grouped_hits", []):
+            for hit in group.get("hits", []):
+                doc = hit["document"]
+                url = doc.get("url", "")
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                content = fetch_live_content(url) or BeautifulSoup(doc.get("content", ""), "html.parser").get_text(" ", strip=True)
+                title = " > ".join([doc.get(f"hierarchy.lvl{i}") for i in range(7) if doc.get(f"hierarchy.lvl{i}")])
+                docs.append({"title": title, "url": url, "content": content})
+                if len(docs) >= max_results:
+                    return docs
+                time.sleep(0.5)
+    return docs
+
+def is_metric_query(query):
+    keywords = ["how many", "count", "average", "sum", "total", "report", "list all", "github", "users", "opportunities"]
+    return any(kw in query.lower() for kw in keywords)
+
+def synthesize_answer(query, docs, provider="openai", model="gpt-4o-mini"):
+    context = "\n\n".join([f"{d['title']} ({d['url']}):\n{d['content']}" for d in docs])
+    llm, cfg = get_llm(provider=provider, model=model)
+    messages = [
+        {"role": "system", "content": (
+            "You are an AI assistant for Omni Analytics. Answer using ONLY the provided context, "
+            "citing 'Slack', 'Documentation', or 'Community'."
+        )},
+        {"role": "user", "content": (
+            f"**User Question**:\n{query}\n\n"
+            f"**Available Information**:\n{context}\n\n"
+            "Now write your answer."
+        )}
+    ]
+    return llm.chat(messages, model=cfg["model"], **cfg.get("params", {}))
+
+def handle_user_query(query):
+    extractor = KeywordExtractor(ngram_config)
+    ngrams = extractor.extract(query)
+    ngrams = prune_stopwords_from_results(ngrams, set(ngram_config["ngram"]["stopwords"]), "remove_stopwords_within_phrase")
+
+    typesense_docs = search_typesense_ngrams(ngrams)
+    for doc in typesense_docs:
+        doc["source"] = "typesense"
+
+    slack_docs = []
+    seen = set()
+    for ng in [ng for ng in ngrams if len(ng.split()) >= 2]:
+        for res in slack_searcher.search(ng):
+            text = res.get("text", "") if isinstance(res, dict) else res
+            url = res.get("metadata", {}).get("permalink", "") if isinstance(res, dict) else ""
+            key = url or text
+            if key in seen:
+                continue
+            seen.add(key)
+            slack_docs.append({
+                "title": "Slack Message",
+                "url": url,
+                "content": text,
+                "source": "slack"
+            })
+
+    mcp_docs = []
+    if ENABLE_MCP and is_metric_query(query):
+        result = mcp_client.run_agentic_inference(query)
+        if "answer" in result:
+            mcp_docs.append({"title": "MCP Answer", "url": "", "content": result["answer"], "source": "mcp"})
+        for step in result.get("reasoning_steps", []):
+            mcp_docs.append({
+                "title": f"MCP Step {step.get('id', '')}",
+                "url": "",
+                "content": step.get("response", ""),
+                "source": "mcp"
+            })
+
+    all_docs = mcp_docs + slack_docs + typesense_docs
+    if not all_docs:
+        return "No relevant documents found.", []
+    return synthesize_answer(query, all_docs), all_docs
