@@ -3,6 +3,9 @@ import sys
 sys.path.insert(0, os.path.abspath(".")) 
 import time
 import json
+import numpy as np
+from pathlib import Path
+from sklearn.metrics.pairwise import cosine_similarity
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -11,6 +14,9 @@ from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExt
 from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
 from applied_ai.slack_search.slack_search.searcher import SlackSearcher
 from applied_ai.mcp_client.mcp_client.registry import MCPRegistry
+from applied_ai.retrieval.retrieval.faiss_retriever import FAISSRetriever
+from applied_ai.chunking.chunking.pipeline import run_chunking
+import faiss
 import openai
 
 
@@ -49,6 +55,32 @@ ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() in {"1", "true", "yes"}
 SLACK_TOKEN = os.getenv("SLACK_API_KEY")
 
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+
+FAISS_COMMUNITY_INDEX_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-discourse.index"
+FAISS_COMMUNITY_META_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-discourse.meta.json"
+
+FAISS_DOCS_INDEX_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-docs.index"
+FAISS_DOCS_META_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-docs.meta.json"
+
+
+def load_json_embeddings(json_dir_or_file):
+    all_chunks = []
+    paths = [Path(json_dir_or_file)] if Path(json_dir_or_file).is_file() else Path(json_dir_or_file).glob("*.json")
+    for path in paths:
+        with open(path) as f:
+            for chunk in json.load(f):
+                if "embedding" in chunk and isinstance(chunk["embedding"], list):
+                    all_chunks.append(chunk)
+    return all_chunks
+
+def search_json_chunks(query_embedding, chunks, top_k=5):
+    if not chunks:
+        return []
+    embeddings = np.array([c["embedding"] for c in chunks])
+    scores = cosine_similarity([query_embedding], embeddings)[0]
+    top_indices = scores.argsort()[-top_k:][::-1]
+    return [chunks[i] for i in top_indices]
+
 if ENABLE_MCP:
     registry = MCPRegistry()
     mcp_client = registry.get_client(
@@ -84,6 +116,8 @@ ngram_config = {
         ]
     }
 }
+
+
 
 def fetch_live_content(url, timeout=8):
     try:
@@ -147,9 +181,9 @@ def handle_user_query(query):
     ngrams = extractor.extract(query)
     ngrams = prune_stopwords_from_results(ngrams, set(ngram_config["ngram"]["stopwords"]), "remove_stopwords_within_phrase")
 
-    typesense_docs = search_typesense_ngrams(ngrams)
-    for doc in typesense_docs:
-        doc["source"] = "typesense"
+    # typesense_docs = search_typesense_ngrams(ngrams)
+    # for doc in typesense_docs:
+    #     doc["source"] = "typesense"
 
     slack_docs = []
     seen = set()
@@ -169,7 +203,38 @@ def handle_user_query(query):
                 "content": text,
                 "source": "slack"
             })
-    print(slack_docs)
+    docs_chunks = load_json_embeddings("/Users/james/Documents/projects/omni_gpt/sources/docs/embeddings-000.json")
+    community_chunks = load_json_embeddings("/Users/james/Documents/projects/omni_gpt/sources/discourse/discourse-000.json")
+
+    query_chunks = run_chunking(
+        raw_text=query,
+        chunk_method="sentence",
+        max_tokens=300,
+        overlap_tokens=40,
+        inject_headers=True,
+        provider="ollama",
+        model_name="nomic-embed-text"
+    )
+    query_embedding = query_chunks[0]["embedding"]
+
+    top_docs = search_json_chunks(query_embedding, docs_chunks)
+    top_docs_formatted = []
+    for chunk in top_docs:
+        top_docs_formatted.append({
+            "title": chunk["metadata"].get("path", "Docs"),
+            "url": "",
+            "content": chunk.get("chunk_text", ""),
+            "source": "docs"
+        })
+    top_community = search_json_chunks(query_embedding, community_chunks)
+    top_community_formatted = []
+    for chunk in top_community:
+        top_community_formatted.append({
+            "title": chunk["metadata"].get("path", "Docs"),
+            "url": "",
+            "content": chunk.get("chunk_text", ""),
+            "source": "docs"
+        })
     mcp_docs = []
     if ENABLE_MCP and is_metric_query(query):
         result = mcp_client.run_agentic_inference(query)
@@ -183,7 +248,7 @@ def handle_user_query(query):
                 "source": "mcp"
             })
 
-    all_docs = mcp_docs + slack_docs + typesense_docs
+    all_docs = mcp_docs + slack_docs + top_docs_formatted + top_community_formatted #+ typesense_docs 
     if not all_docs:
         return "No relevant documents found.", []
     return synthesize_answer(query, all_docs), all_docs
