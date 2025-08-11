@@ -4,7 +4,7 @@ from app_core import handle_user_query
 import sys, os
 sys.path.insert(0, os.path.abspath("."))
 
-st.set_page_config(page_title="Omni Assistant", layout="wide")
+st.set_page_config(page_title="Omni-GPT", layout="centered")
 
 st.title("Omni-GPT")
 # Initialize chat history
