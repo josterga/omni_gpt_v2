@@ -7,7 +7,6 @@ sys.path.insert(0, os.path.abspath("."))
 st.set_page_config(page_title="Omni Assistant", layout="wide")
 
 st.title("Omni-GPT")
-
 # Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []

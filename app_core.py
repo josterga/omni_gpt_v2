@@ -233,9 +233,9 @@ def handle_user_query(query):
     slack_docs = []
     seen = set()
     slack_ngrams = ngrams.get("ngram") if isinstance(ngrams, dict) else ngrams
-
+    search_excluded = " -in:customer-sla-breach -in:customer-triage -in:support-overflow -in:omnis -in:customer-membership-alerts -in:vector-alerts -in:notifications-alerts -cypress -github -sentry -squadcast -syften -in:leadership -in:leaders"
     for ng in slack_ngrams:
-        for res in slack_searcher.search(ng):
+        for res in slack_searcher.search(ng+search_excluded):
             channel_name = res.get("metadata", {}).get("channel_name") or res.get("metadata", {}).get("channel")
             text = res.get("text", "") if isinstance(res, dict) else res
             url = res.get("metadata", {}).get("permalink", "") if isinstance(res, dict) else ""
@@ -305,7 +305,7 @@ def handle_user_query(query):
                 "source": "mcp"
             })
 
-    all_docs = mcp_docs + slack_docs + top_docs_formatted + top_community_formatted + typesense_docs 
+    all_docs = mcp_docs + slack_docs + top_docs_formatted + top_community_formatted #+ typesense_docs # removed for now but will make a module/tool
     if not all_docs:
         return "No relevant documents found.", []
     return synthesize_answer(query, all_docs), all_docs
