@@ -285,10 +285,17 @@ def handle_user_query(query):
         })
     top_community = search_json_chunks(query_embedding, community_chunks)
     top_community_formatted = []
+    community_base_url="https://community.omni.co/t/"
     for chunk in top_community:
+        slug = str(chunk["metadata"].get("slug") or "")
+        topic_id = str(chunk["metadata"].get("topic_id") or "")
+        if slug and topic_id:
+            community_path = f"{community_base_url}{slug}/{topic_id}/"
+        else:
+            community_path = None
         top_community_formatted.append({
-            "title": chunk["metadata"].get("path", "Docs"),
-            "url": "",
+            "title": chunk["metadata"].get("slug", "Community"),
+            "url": community_path,
             "content": chunk.get("chunk_text", ""),
             "source": "community"
         })
