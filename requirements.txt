@@ -1,0 +1,18 @@
+# --- Core app ---
+streamlit>=1.37,<2
+python-dotenv>=1.0,<2
+requests>=2.31,<3
+beautifulsoup4>=4.12,<5
+numpy>=1.26,<3
+scikit-learn>=1.4,<2
+openai>=1.40,<2           # you use openai.OpenAI(...) API (v1+)
+slack-sdk>=3.27,<4        # SlackSearcher relies on slack_sdk
+faiss-cpu>=1.8.0,<2       # use CPU wheel on Linux/Cloud
+
+# --- Install your monorepo subpackages from the repo ----
+-e applied_ai/chunking
+-e applied_ai/retrieval
+-e applied_ai/generation
+-e applied_ai/mcp_client
+-e applied_ai/keyword_extraction
+-e applied_ai/slack_search
