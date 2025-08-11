@@ -9,12 +9,12 @@ openai>=1.40,<2
 slack-sdk>=3.27,<4
 faiss-cpu>=1.8.0,<2
 
-# applied_ai monorepo packages (branch: omni_gpt)
-git+https://github.com/josterga/applied_ai@omni_gpt#subdirectory=chunking
-git+https://github.com/josterga/applied_ai@omni_gpt#subdirectory=retrieval
-git+https://github.com/josterga/applied_ai@omni_gpt#subdirectory=keyword_extraction
-git+https://github.com/josterga/applied_ai@omni_gpt#subdirectory=slack_search
-git+https://github.com/josterga/applied_ai@omni_gpt#subdirectory=mcp_client
+# applied-ai monorepo packages (branch: omni_gpt)
+git+https://github.com/josterga/applied-ai@omni_gpt#subdirectory=chunking
+git+https://github.com/josterga/applied-ai@omni_gpt#subdirectory=retrieval
+git+https://github.com/josterga/applied-ai@omni_gpt#subdirectory=keyword_extraction
+git+https://github.com/josterga/applied-ai@omni_gpt#subdirectory=slack_search
+git+https://github.com/josterga/applied-ai@omni_gpt#subdirectory=mcp_client
 
 # generation lives in its own repo (branch: omni_gpt)
 git+https://github.com/josterga/generation@omni_gpt
