@@ -11,6 +11,12 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import faiss
 import openai
+import nltk
+# Ensure punkt_tab is available
+try:
+    nltk.data.find("tokenizers/punkt_tab")
+except LookupError:
+    nltk.download("punkt_tab")
 # Dev (monorepo) vs Prod (pip-installed) import shim
 try:
     # Dev: monorepo namespace
