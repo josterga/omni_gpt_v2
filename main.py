@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath("."))
 
 st.set_page_config(page_title="Omni Assistant", layout="wide")
 
-st.title("🤖 Omni Assistant")
+st.title("Omni-GPT")
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -18,7 +18,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # Chat input (anchored at bottom)
-user_input = st.chat_input("Ask something...")
+user_input = st.chat_input("Ask anything about Omni...")
 
 if user_input:
     # Add user message
@@ -28,17 +28,19 @@ if user_input:
 
     # Generate and display answer
     with st.chat_message("assistant"):
-        with st.spinner("Analyzing and searching..."):
+        with st.spinner("Searching..."):
             answer, docs = handle_user_query(user_input)
 
         # Format answer with optional sources
-        full_answer = f"**Answer:**\n\n{answer}"
+        st.markdown(f"**Response:**\n\n{answer}")
+
         if docs:
-            full_answer += "\n\n---\n**Sources:**\n"
-            for doc in docs:
-                doc_link = f"[🔗]({doc['url']})" if doc["url"] else ""
-                full_answer += f"- **{doc['title']}** {doc_link}\n"
-
-
-        st.markdown(full_answer)
-        st.session_state.messages.append({"role": "assistant", "content": full_answer})
+            with st.expander("Sources"):
+                for doc in docs:
+                    doc_link = f"[🔗]({doc['url']})" if doc["url"] else ""
+                    st.markdown(f"- **{doc['title']}** {doc_link}")
+        # Save to history
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"**Answer:**\n\n{answer}"
+        })

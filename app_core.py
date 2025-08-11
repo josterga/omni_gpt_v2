@@ -19,9 +19,16 @@ from applied_ai.chunking.chunking.pipeline import run_chunking
 import faiss
 import openai
 
-
 load_dotenv()
 
+OMNI_MODEL_ID = os.getenv("OMNI_MODEL_ID")
+OMNI_API_KEY = os.getenv("OMNI_API_KEY")
+BASE_URL = os.getenv("BASE_URL")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() in {"1", "true", "yes"}
+SLACK_TOKEN = os.getenv("SLACK_API_KEY")
+slack_searcher = SlackSearcher(slack_token=SLACK_TOKEN, result_limit=3, thread_limit=5)
 TYPESENSE_API_KEY = os.getenv('TYPESENSE_API_KEY')
 TYPESENSE_BASE_URL = os.getenv('TYPESENSE_BASE_URL')
 TYPESENSE_URL = f"https://{TYPESENSE_BASE_URL}-1.a1.typesense.net/multi_search?x-typesense-api-key={TYPESENSE_API_KEY}"
@@ -46,31 +53,47 @@ TYPESENSE_SEARCH_BODY_TEMPLATE = {
         }
     ]
 }
-
-OMNI_MODEL_ID = os.getenv("OMNI_MODEL_ID")
-OMNI_API_KEY = os.getenv("OMNI_API_KEY")
-BASE_URL = os.getenv("BASE_URL")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() in {"1", "true", "yes"}
-SLACK_TOKEN = os.getenv("SLACK_API_KEY")
-
-openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
-
-FAISS_COMMUNITY_INDEX_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-discourse.index"
-FAISS_COMMUNITY_META_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-discourse.meta.json"
-
-FAISS_DOCS_INDEX_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-docs.index"
-FAISS_DOCS_META_PATH = "/Users/james/Documents/projects/omni_gpt/faiss/ollama-paragraph-docs.meta.json"
-
+ngram_config = {
+    "strategy": "ngram",
+    "ngram": {
+        "ngram_sizes": [1, 2, 3],
+        "stopwords": [
+            "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "as", "at",
+            "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "could", "did", "do",
+            "does", "doing", "down", "during", "each", "few", "for", "from", "further", "had", "has", "have", "having",
+            "he", "her", "here", "hers", "herself", "him", "himself", "his", "how", "i", "if", "in", "into", "is", "it",
+            "its", "itself", "just", "me", "more", "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on",
+            "once", "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should",
+            "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then", "there",
+            "these", "they", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "we",
+            "were", "what", "when", "where", "which", "while", "who", "whom", "why", "will", "with", "you", "your",
+            "yours", "yourself", "yourselves"
+        ]
+    }
+}
 
 def load_json_embeddings(json_dir_or_file):
     all_chunks = []
-    paths = [Path(json_dir_or_file)] if Path(json_dir_or_file).is_file() else Path(json_dir_or_file).glob("*.json")
+    paths = [Path(json_dir_or_file)] if Path(json_dir_or_file).is_file() else Path(json_dir_or_file).glob("*.json*")
+    
     for path in paths:
         with open(path) as f:
-            for chunk in json.load(f):
-                if "embedding" in chunk and isinstance(chunk["embedding"], list):
-                    all_chunks.append(chunk)
+            if path.suffix == ".jsonl":
+                for line in f:
+                    try:
+                        chunk = json.loads(line)
+                        if "embedding" in chunk and isinstance(chunk["embedding"], list):
+                            all_chunks.append(chunk)
+                    except json.JSONDecodeError:
+                        continue
+            elif path.suffix == ".json":
+                try:
+                    data = json.load(f)
+                    for chunk in data:
+                        if "embedding" in chunk and isinstance(chunk["embedding"], list):
+                            all_chunks.append(chunk)
+                except json.JSONDecodeError:
+                    continue
     return all_chunks
 
 def search_json_chunks(query_embedding, chunks, top_k=5):
@@ -95,29 +118,6 @@ if ENABLE_MCP:
     )
 else:
     mcp_client = None
-
-slack_searcher = SlackSearcher(slack_token=SLACK_TOKEN, result_limit=5, thread_limit=5)
-
-ngram_config = {
-    "strategy": "ngram",
-    "ngram": {
-        "ngram_sizes": [1, 2, 3],
-        "stopwords": [
-            "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "as", "at",
-            "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "could", "did", "do",
-            "does", "doing", "down", "during", "each", "few", "for", "from", "further", "had", "has", "have", "having",
-            "he", "her", "here", "hers", "herself", "him", "himself", "his", "how", "i", "if", "in", "into", "is", "it",
-            "its", "itself", "just", "me", "more", "most", "my", "myself", "no", "nor", "not", "now", "of", "off", "on",
-            "once", "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should",
-            "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then", "there",
-            "these", "they", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "we",
-            "were", "what", "when", "where", "which", "while", "who", "whom", "why", "will", "with", "you", "your",
-            "yours", "yourself", "yourselves"
-        ]
-    }
-}
-
-
 
 def fetch_live_content(url, timeout=8):
     try:
@@ -164,15 +164,42 @@ def synthesize_answer(query, docs, provider="openai", model="gpt-4o-mini"):
     context = "\n\n".join([f"{d['title']} ({d['url']}):\n{d['content']}" for d in docs])
     llm, cfg = get_llm(provider=provider, model=model)
     messages = [
-        {"role": "system", "content": (
-            "You are an AI assistant for Omni Analytics. Answer using ONLY the provided context, "
-            "citing 'Slack', 'Documentation', or 'Community'."
-        )},
-        {"role": "user", "content": (
-            f"**User Question**:\n{query}\n\n"
-            f"**Available Information**:\n{context}\n\n"
-            "Now write your answer."
-        )}
+        {
+            "role": "system",
+            "content": (
+                "You are an AI assistant for Omni Analytics. You are answering the user's question using ONLY the provided information, "
+                "which includes Slack conversations, official documentation, and community (discourse) discussions."
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                "Important Instructions:\n"
+                "- Use only the provided context. **Do not hallucinate** or invent facts.\n"
+                "- Clearly cite where each point comes from (e.g., 'Slack', 'Documentation', 'Community').\n"
+                "- Follow the answer structure below.\n"
+                "\n---\n\n"
+                f"**User Question**:\n{query}\n\n"
+                "---\n\n"
+                f"**Available Information**:\n{docs}\n\n"
+                "---\n\n"
+                "**Answer Format**:\n\n"
+                "1. **Answer**  \n"
+                "- Summarize the correct response in a clear, human-readable way.  \n"
+                "- Use only the information from the provided context.  \n"
+                "- If there are multiple answers to the question, include all answers.  \n"
+                "- Do **not** hallucinate or add unstated assumptions.\n"
+                "- If the question or context involves structured data (e.g., YAML, JSON, config files, code), include an **example derived from the context** formatted in a fenced code block. Do not hallucinate YAML or code.\n\n"
+                "2. **Source Highlights**  \n"
+                "- List key facts or data points from the sources that directly support the answer.  \n"
+                "- Do not restate entire paragraphs.\n\n"
+                "3. **Unanswered Questions** *(if applicable)*  \n"
+                "- Note any aspects of the user's question that the provided information does **not** answer.  \n"
+                "- Be concise but honest about the gap.\n"
+                "- If there are no unanswered questions, don't include this section as part of your answer.\n\n"
+                "Now write your answer."
+            )
+        }
     ]
     return llm.chat(messages, model=cfg["model"], **cfg.get("params", {}))
 
@@ -181,9 +208,9 @@ def handle_user_query(query):
     ngrams = extractor.extract(query)
     ngrams = prune_stopwords_from_results(ngrams, set(ngram_config["ngram"]["stopwords"]), "remove_stopwords_within_phrase")
 
-    # typesense_docs = search_typesense_ngrams(ngrams)
-    # for doc in typesense_docs:
-    #     doc["source"] = "typesense"
+    typesense_docs = search_typesense_ngrams(ngrams)
+    for doc in typesense_docs:
+        doc["source"] = "typesense"
 
     slack_docs = []
     seen = set()
@@ -191,6 +218,7 @@ def handle_user_query(query):
 
     for ng in slack_ngrams:
         for res in slack_searcher.search(ng):
+            channel_name = res.get("metadata", {}).get("channel_name") or res.get("metadata", {}).get("channel")
             text = res.get("text", "") if isinstance(res, dict) else res
             url = res.get("metadata", {}).get("permalink", "") if isinstance(res, dict) else ""
             key = url or text
@@ -198,13 +226,14 @@ def handle_user_query(query):
                 continue
             seen.add(key)
             slack_docs.append({
-                "title": "Slack Message",
+                "title": f"Slack – #{channel_name}" if channel_name else "Slack",
                 "url": url,
                 "content": text,
                 "source": "slack"
             })
-    docs_chunks = load_json_embeddings("/Users/james/Documents/projects/omni_gpt/sources/docs/embeddings-000.json")
-    community_chunks = load_json_embeddings("/Users/james/Documents/projects/omni_gpt/sources/discourse/discourse-000.json")
+
+    docs_chunks = load_json_embeddings(Path("sources/docs/docs-000.jsonl"))
+    community_chunks = load_json_embeddings(Path("sources/discourse/discourse-000.jsonl"))
 
     query_chunks = run_chunking(
         raw_text=query,
@@ -212,17 +241,27 @@ def handle_user_query(query):
         max_tokens=300,
         overlap_tokens=40,
         inject_headers=True,
-        provider="ollama",
-        model_name="nomic-embed-text"
+        provider="voyage",
+        model_name="voyage-3.5"
     )
     query_embedding = query_chunks[0]["embedding"]
 
     top_docs = search_json_chunks(query_embedding, docs_chunks)
     top_docs_formatted = []
+    docs_base_url = "https://docs.omni.co/"
     for chunk in top_docs:
+        raw_path = chunk["metadata"].get("path", "")
+        trimmed_path = raw_path.replace("./docs/", "", 1).removesuffix(".md")
+        parts = trimmed_path.split("/", 1)
+        if "-" in parts[0] and parts[0].split("-")[0].isdigit():
+            parts[0] = "-".join(parts[0].split("-")[1:])
+        trimmed_path = "/".join(parts)
+
+        direct_url = docs_base_url + trimmed_path
+
         top_docs_formatted.append({
-            "title": chunk["metadata"].get("path", "Docs"),
-            "url": "",
+            "title": direct_url,
+            "url": direct_url,
             "content": chunk.get("chunk_text", ""),
             "source": "docs"
         })
@@ -233,7 +272,7 @@ def handle_user_query(query):
             "title": chunk["metadata"].get("path", "Docs"),
             "url": "",
             "content": chunk.get("chunk_text", ""),
-            "source": "docs"
+            "source": "community"
         })
     mcp_docs = []
     if ENABLE_MCP and is_metric_query(query):
@@ -248,7 +287,7 @@ def handle_user_query(query):
                 "source": "mcp"
             })
 
-    all_docs = mcp_docs + slack_docs + top_docs_formatted + top_community_formatted #+ typesense_docs 
+    all_docs = mcp_docs + slack_docs + top_docs_formatted + top_community_formatted + typesense_docs 
     if not all_docs:
         return "No relevant documents found.", []
     return synthesize_answer(query, all_docs), all_docs
