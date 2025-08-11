@@ -9,13 +9,22 @@ from sklearn.metrics.pairwise import cosine_similarity
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from applied_ai.generation.generation.router import get_llm
-from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExtractor
-from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
-from applied_ai.slack_search.slack_search.searcher import SlackSearcher
-from applied_ai.mcp_client.mcp_client.registry import MCPRegistry
-from applied_ai.retrieval.retrieval.faiss_retriever import FAISSRetriever
-from applied_ai.chunking.chunking.pipeline import run_chunking
+# Dev (monorepo) vs Prod (pip-installed) import shim
+try:
+    # Dev: monorepo namespace
+    from applied_ai.generation.generation.router import get_llm
+    from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExtractor
+    from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
+    from applied_ai.slack_search.slack_search.searcher import SlackSearcher
+    from applied_ai.retrieval.retrieval.faiss_retriever import FAISSRetriever
+except ImportError:
+    # Prod: packages installed from Git subdirectories (no namespace)
+    from generation.router import get_llm
+    from keyword_extractor.extractor import KeywordExtractor
+    from keyword_extractor.stopword_pruner import prune_stopwords_from_results
+    from slack_search.searcher import SlackSearcher
+    from retrieval.faiss_retriever import FAISSRetriever
+
 import faiss
 import openai
 
