@@ -23,7 +23,7 @@ try:
     from applied_ai.chunking.chunking.pipeline import run_chunking
 except ImportError:
     # Prod: packages installed from Git subdirectories (no namespace)
-    from generation.generation.router import get_llm
+    from generation.router import get_llm
     from keyword_extraction.keyword_extractor.extractor import KeywordExtractor
     from keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
     from slack_search.slack_search.searcher import SlackSearcher
