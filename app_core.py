@@ -24,13 +24,12 @@ try:
 except ImportError:
     # Prod: packages installed from Git subdirectories (no namespace)
     from generation.router import get_llm
-    from keyword_extraction.keyword_extractor.extractor import KeywordExtractor
-    from keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
-    from slack_search.slack_search.searcher import SlackSearcher
-    from mcp_client.mcp_client.registry import MCPRegistry
-    from retrieval.retrieval.faiss_retriever import FAISSRetriever
-    from chunking.chunking.pipeline import run_chunking
-
+    from keyword_extractor.extractor import KeywordExtractor                # ← correct
+    from keyword_extractor.stopword_pruner import prune_stopwords_from_results
+    from slack_search.searcher import SlackSearcher
+    from retrieval.faiss_retriever import FAISSRetriever
+    from chunking.pipeline import run_chunking
+    from mcp_client.registry import MCPRegistry  
 
 load_dotenv()
 
