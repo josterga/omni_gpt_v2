@@ -91,7 +91,7 @@ tool_catalog = {
     # Slack search (works with needs_ngrams + with_slack_exclusions)
     "slack_search": {
         "name": "slack_search",
-        "description": "Search Slack messages/threads and return relevant snippets. Great for recent decisions, tribal knowledge, and ephemeral fixes. You can include filters for in:#<channel> in the query. Every customer has their own channel using omni-<customer> as the name. Internal product feature-related channels: ai, ai-development, api, backend, calcs, dashboards, dbt, disco-stew, docs, drafts-branches, embed, eng, event-loop-lag, it-help, modeling, omni-omni-analytics, product, product-promise-requests, proj-ai-docs, proj-csv-upload, scheduled-deliveries-and-alerts,  spreadsheets, ux, visualizations. Sales/Marketing-related channels: sales, marketing, closed-lost-notifications, sigma-compete, optys-qual-hall.",
+        "description": "Search Slack messages/threads and return relevant snippets. Great for discussions, recent decisions, feature updates, niche workflows, tribal knowledge, and ephemeral fixes. You can include filters for in:#<channel> in the query. Every customer has their own channel using omni-<customer> as the name. Internal product feature-related channels: ai, ai-development, api, backend, calcs, dashboards, dbt, disco-stew, docs, drafts-branches, embed, eng, event-loop-lag, it-help, modeling, omni-omni-analytics, product, product-promise-requests, proj-ai-docs, proj-csv-upload, scheduled-deliveries-and-alerts,  spreadsheets, ux, visualizations. Sales/Marketing-related channels: sales, marketing, closed-lost-notifications, sigma-compete, optys-qual-hall.",
         "produces": "docs",
         "run": lambda args, qa=None: {
             "kind": "docs",
@@ -115,7 +115,7 @@ tool_catalog = {
     # Docs embedding search
     "docs_embed_search": {
         "name": "docs_embed_search",
-        "description": "Semantic search over embedded Omni Docs JSON chunks. Best for official processes, architecture, deployment guides.",
+        "description": "Semantic search over embedded Omni Docs JSON chunks. Best for official processes, product architecture and features, deployment guides.",
         "produces": "docs",
         "run": lambda args, qa=None: {
             "kind": "docs",
@@ -133,7 +133,7 @@ tool_catalog = {
     # Community embedding search
     "community_embed_search": {
         "name": "community_embed_search",
-        "description": "Semantic search over embedded Community (Discourse) JSON chunks. Contains articles covering best practices, how-tos, and common patterns.",
+        "description": "Semantic search over embedded Community (Discourse) JSON chunks. Contains articles covering best practices, how-tos, common patterns and workflows.",
         "produces": "docs",
         "run": lambda args, qa=None: {
             "kind": "docs",
