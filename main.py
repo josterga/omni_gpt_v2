@@ -27,7 +27,13 @@ def get_run_query():
         return lambda mode, query, tools: ("Error: Import failed", [], {}, [])
 
 # UI controls
-mode = st.radio("Mode", ["search", "planned"], index=0, horizontal=True)
+mode = st.radio(
+    "Mode", 
+    ["search", "planned"], 
+    index=0, 
+    horizontal=True,
+    help="Search: Direct tool execution | Planned: Multi-tool orchestration"
+)
 
 # Get tool catalog and run_query function
 tool_catalog = get_tool_catalog()

@@ -40,7 +40,7 @@ def synthesize_answer(query: str,
             {
                 "role": "system",
                 "content": (
-                    "You are an AI assistant for Omni Analytics. You are answering the user's question using ONLY the provided information"
+                    "You are an AI assistant for Omni Analytics. You are given context from multiple sources. "
                     "Use ONLY the provided context. If the context is insufficient, say exactly what is missing."
                 )
             },
