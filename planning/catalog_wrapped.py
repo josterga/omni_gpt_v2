@@ -36,27 +36,37 @@ def sanitize_fathom_params(llm_output: dict) -> dict:
 
 def fathom_param_generator(user_query: str) -> dict:
     default_after = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00Z")
+    today_iso = datetime.utcnow().strftime("%Y-%m-%dT00:00:00Z")
     prompt = f"""
-You are a strict parameter generator for the Fathom Meetings API.
+        You are a strict parameter generator for the Fathom Meetings API.
 
-Given the user's request, produce ONLY valid JSON with exactly one top-level key: "params".
+        Given the user's request, produce ONLY valid JSON containing relevant params.
+        The JSON must have exactly one top-level key: "params".
+        Interpret all dates relative to today's date: {today_iso}.
 
-The "params" object may contain only:
-- created_after (ISO datetime string)
-- created_before (ISO datetime string)
-- meeting_type ("external" or "internal")
-- calendar_invitees (list of emails)
-- calendar_invitees_domains (list of domains)
-- include_summary (boolean)
-- include_transcript (boolean)
+        The "params" object may contain only the following keys:
+        - created_after (ISO 8601 datetime string, e.g., "2025-08-01T00:00:00Z")
+        - created_before (ISO 8601 datetime string)
+        - meeting_type (string, must be exactly "external" or "internal")
+        - calendar_invitees (list of full email addresses)
+        - calendar_invitees_domains (list of domain strings, e.g., ["blvd.co"])
+        - include_summary (boolean: true or false)
+        - include_transcript (boolean: true or false)
 
-If the request has no date range, default to:
-  {{"created_after": "{default_after}"}}
+        Rules:
+        1. DO NOT include any keys that are not listed above.
+        2. If the user does not specify a time range, default to:
+        {{"created_after": "{default_after}"}}
+        3. If a parameter is not relevant, omit it.
+        4. Your entire output must be valid JSON with this shape:
+        {{
+            "params": {{
+            ...
+            }}
+        }}
 
-If a parameter is not relevant, omit it.
-
-User request: {user_query}
-"""
+        User request: {user_query}
+        """
 
     llm, cfg = get_llm(provider="openai", model="gpt-4o-mini")
     raw = llm.chat([{"role": "user", "content": prompt}],
@@ -65,35 +75,13 @@ User request: {user_query}
         parsed = json.loads(str(raw))
     except Exception:
         parsed = {"params": {}}
-    return sanitize_fathom_params(parsed)
+    sanitized = sanitize_fathom_params(parsed)
 
-def wrap_fathom_tool(fn, mode):
-    """
-    Wrap fathom_list_meetings so that:
-    - Direct mode: skipped entirely (no API call)
-    - Planned mode: params are generated via LLM if not provided
-    """
-    def wrapped(args, qa=None):
-        if mode != "planned":
-            return {
-                "kind": "text",
-                "value": "[Fathom skipped — only available in planned mode]",
-                "preview": "fathom:skipped"
-            }
+    # Enforce default if missing
+    if "created_after" not in sanitized["params"]:
+        sanitized["params"]["created_after"] = default_after
 
-        params = args.get("params", {})
-        if not params and qa:
-            params = fathom_param_generator(
-                getattr(qa, "raw_query", "") or getattr(qa, "original_query", "") or str(qa)
-            )["params"]
-
-        # Default to last 14 days if no date range
-        if "created_after" not in params:
-            params["created_after"] = (datetime.utcnow() - timedelta(days=14)).isoformat() + "Z"
-
-        args["params"] = params
-        return fn(args)
-    return wrapped
+    return sanitized
 
 def build_wrapped_catalog(is_metric_fn, mode="direct"):
     """
@@ -123,9 +111,20 @@ def build_wrapped_catalog(is_metric_fn, mode="direct"):
 
         elif k == "fathom_list_meetings":
             def run_with_llm(args, qa=None, _orig=v["run"]):
-                # If params are missing, try to generate them from raw query
-                if not args.get("params") and qa:
+                # Start with any existing params from args
+                merged = dict(args.get("params", {}))
+
+                # Merge stray args into params only if they are in ALLOWED_PARAMS
+                for key, val in args.items():
+                    if key != "params" and key in ALLOWED_PARAMS:
+                        merged[key] = val
+
+                args["params"] = merged
+
+                # If still no params, generate from LLM
+                if not args["params"] and qa:
                     args["params"] = fathom_param_generator(qa.raw_query)["params"]
+                print(qa, args)
                 return _orig(args)
 
             run = run_with_llm
