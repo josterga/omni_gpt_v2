@@ -8,8 +8,8 @@ from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prun
 from applied_ai.chunking.chunking.pipeline import run_chunking
 from app_core import is_metric_query, ngram_config
 from applied_ai.generation.generation.router import get_llm
+from evidence import flatten_for_synth  # <-- import the unified flattener
 from synthesis import synthesize_answer
-
 
 def make_lazy_artifacts(query: str) -> LazyQueryArtifacts:
     def extractor():
@@ -41,10 +41,8 @@ def run(query: str, *, allowed_tool_ids: list[str]):
     qa = make_lazy_artifacts(query)
     catalog = build_wrapped_catalog(is_metric_query, mode="planned")
 
-    # Filter for planner
     filtered = {k: v for k, v in catalog.items() if k in allowed_tool_ids}
 
-    # Bind qa into each tool (avoid late-binding bug)
     bound = {}
     for k, v in filtered.items():
         def make_run(vv):
@@ -60,71 +58,50 @@ def run(query: str, *, allowed_tool_ids: list[str]):
     if evidence:
         raw_items.extend(evidence)
 
-    # Some executors only put structured outputs in trace
     for sid, t in (trace or {}).items():
         out = t.get("output")
         if isinstance(out, dict):
-            # preserve tool name for source
-            raw_items.append({**out, "tool": t.get("tool") or sid})
-
-    # ---- Normalize into docs for synthesis ----
-    normed_docs = []
-    for ev in (raw_items or []):
-        # Unwrap if the tool stuffed result under "output"
-        payload = ev.get("output") if isinstance(ev.get("output"), dict) else ev
-        if not isinstance(payload, dict):
-            # string or something else → make it text
-            normed_docs.append({
-                "title": ev.get("tool") or "tool",
-                "url": "",
-                "content": str(payload),
-                "source": ev.get("source") or ev.get("tool") or "tool",
-            })
-            continue
-
-        source = payload.get("source") or ev.get("tool") or "tool"
-        kind = payload.get("kind") or ev.get("kind") or "text"
-        val = payload.get("value")
-
-        if kind == "docs" and isinstance(val, list):
-            for d in val:
-                if not isinstance(d, dict):
-                    continue
-                normed_docs.append({
-                    "title": d.get("title") or source or "doc",
-                    "url": d.get("url") or "",
-                    "content": d.get("text") or d.get("chunk_text") or "",
-                    "source": d.get("source") or source,
-                })
-
-        elif kind == "text":
-            text = val if isinstance(val, str) else str(val)
-            if text.strip():
-                normed_docs.append({
-                    "title": source,
-                    "url": "",
-                    "content": text,
-                    "source": source,
-                })
-
-        elif kind == "json":
-            try:
-                compact = json.dumps(val, ensure_ascii=False)
-            except Exception:
-                compact = str(val)
-            normed_docs.append({
-                "title": f"{source} (json)",
-                "url": "",
-                "content": compact[:800],
-                "source": source,
+            raw_items.append({
+                "kind": out.get("kind", "json"),
+                "value": out.get("value"),
+                "tool": t.get("tool") or sid,
+                "source": out.get("source") or (t.get("tool") or sid)
             })
 
-    # Debug aid
-    print(f"[planned] normed_docs={len(normed_docs)} | nonempty_contents={sum(1 for d in normed_docs if (d.get('content') or '').strip())}")
+
+
+    print("\n[DEBUG] raw_items before flatten_for_synth")
+    for i, item in enumerate(raw_items, 1):
+        src = item.get("source") or item.get("tool")
+        kind = item.get("kind")
+        val_type = type(item.get("value")).__name__
+        print(f"{i}. tool={src} kind={kind} value_type={val_type}")
+        if src == "slack_search":
+            print("    value:", item.get("value"))
+
+    # ---- Flatten into docs for synthesis ----
+    normed_docs = flatten_for_synth(raw_items, mode="planned")
+
+    print(f"[planned] flattened_docs={len(normed_docs)} | nonempty_contents={sum(1 for d in normed_docs if (d.get('content') or '').strip())}")
     if normed_docs:
         first = normed_docs[0]
         print(f"[planned] sample: title={first.get('title')} url={first.get('url')} content_len={len(first.get('content',''))}")
 
+    context_preview = "\n\n".join(
+    f"{d.get('source') or ''} | {d.get('title') or ''}:\n{d.get('content') or ''}"
+    for d in normed_docs
+    )
+    token_est = len(context_preview.split())  # crude token estimate
+    print(f"[planned] context approx {token_est} words / {token_est//0.75:.0f} tokens")
+    print(f"[planned] first 500 chars of context:\n{context_preview[:500]}")
     # ---- Synthesize ----
-    answer = synthesize_answer(query, normed_docs, provider="openai", model="gpt-4o-mini")
+    answer = synthesize_answer(
+        query,
+        normed_docs,
+        provider="openai",
+        model="gpt-5",  # large-context model
+        params={
+            "max_completion_tokens": 6000
+        }
+    )
     return answer, steps, trace, normed_docs

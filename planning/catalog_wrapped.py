@@ -35,7 +35,7 @@ def sanitize_fathom_params(llm_output: dict) -> dict:
     return {"params": params}
 
 def fathom_param_generator(user_query: str) -> dict:
-    default_after = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00Z")
+    default_after = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%dT00:00:00Z")
     today_iso = datetime.utcnow().strftime("%Y-%m-%dT00:00:00Z")
     prompt = f"""
         You are a strict parameter generator for the Fathom Meetings API.
@@ -56,7 +56,7 @@ def fathom_param_generator(user_query: str) -> dict:
         Rules:
         1. DO NOT include any keys that are not listed above.
         2. If the user does not specify a time range, default to:
-        {{"created_after": "{default_after}"}}
+        {{"created_after": "{default_after}"}}. Always select the smallest timeframe necessary to answer the user query.
         3. If a parameter is not relevant, omit it.
         4. Your entire output must be valid JSON with this shape:
         {{
@@ -111,21 +111,39 @@ def build_wrapped_catalog(is_metric_fn, mode="direct"):
 
         elif k == "fathom_list_meetings":
             def run_with_llm(args, qa=None, _orig=v["run"]):
-                # Start with any existing params from args
+                # Merge existing params
                 merged = dict(args.get("params", {}))
-
-                # Merge stray args into params only if they are in ALLOWED_PARAMS
                 for key, val in args.items():
                     if key != "params" and key in ALLOWED_PARAMS:
                         merged[key] = val
-
                 args["params"] = merged
 
-                # If still no params, generate from LLM
+                # Generate params from LLM if none provided
                 if not args["params"] and qa:
                     args["params"] = fathom_param_generator(qa.raw_query)["params"]
-                print(qa, args)
-                return _orig(args)
+
+                # Call the original tool
+                result = _orig(args)
+
+                # Ensure `value` contains the full meetings list
+                if isinstance(result, dict):
+                    # If original run didn't already set value, fallback to full object
+                    if result.get("kind") == "json" and not result.get("value"):
+                        # If `result` itself is the list, wrap it
+                        if isinstance(result, list):
+                            result = {
+                                "kind": "json",
+                                "value": result,
+                                "source": "fathom_list_meetings",
+                                "preview": f"fathom meetings: {len(result)} found"
+                            }
+                        else:
+                            # If the dict has a 'meetings' key, use that
+                            meetings_list = result.get("meetings")
+                            if meetings_list:
+                                result["value"] = meetings_list
+                                result["preview"] = f"fathom meetings: {len(meetings_list)} found"
+                return result
 
             run = run_with_llm
 

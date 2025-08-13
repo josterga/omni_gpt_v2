@@ -159,7 +159,7 @@ tool_catalog = {
     # MCP query
     "mcp_query": {
         "name": "mcp_query",
-        "description": "Ask MCP for a synthesized answer w/ reasoning. MCP queries are passed to a LLM which generates a SQL query against the database for a particular topic. Topics are selected by the MCP server. Data may include: Github, Salesforce, Product Usage Data (Organizations, Users, Queries, Models, Features), Customer Support Data (Pylon).",
+        "description": "Ask MCP for a synthesized answer w/ reasoning. MCP queries are passed to a LLM which generates a SQL query against the database for a particular topic. Topics are selected by the MCP server. Data may include: Github, Salesforce (Accounts, Opportunities, Contacts, Domains), Product Usage Data (Organizations, Users, Queries, Models, Features), Customer Support Data (Pylon).",
         "produces": "text",
         "run": lambda args, qa=None: (
         lambda query_text: (
@@ -188,7 +188,7 @@ tool_catalog = {
     "fathom_list_meetings": {
         "name": "fathom_list_meetings",
         "description": (
-            "List meeting records from the Fathom API. "
+            "List meeting records from the Fathom API."
             "Limit results to smallest set needed to answer the question. "
         ),
         "produces": "json",

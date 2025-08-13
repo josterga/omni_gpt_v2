@@ -71,7 +71,7 @@ def run(query: str, *, allowed_tool_ids: list[str]):
             all_evidence.append({"kind": "error", "value": str(e), "source": tool_id})
             trace[tool_id] = {"ok": False, "error": str(e)}
 
-    docs_for_synth = flatten_for_synth(all_evidence)
+    docs_for_synth = flatten_for_synth(all_evidence, mode="direct")
     answer = synthesize_answer(query, docs_for_synth, provider="openai", model="gpt-4o-mini")
     steps = [{"id": f"run:{tid}", "tool": tid, "args": {"query": query}} for tid in allowed_tool_ids if tid in catalog]
     return answer, steps, trace, docs_for_synth

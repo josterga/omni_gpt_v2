@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from fathom_api import list_meetings
 
 # Get last 14 days of external calls for google/alphabet
-created_after = (datetime.now(tz=timezone.utc) - timedelta(days=1)).isoformat()
+created_after = (datetime.now(tz=timezone.utc) - timedelta(days=7)).isoformat()
 
 params = {
     "meeting_type": "external",
