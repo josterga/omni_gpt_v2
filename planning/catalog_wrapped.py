@@ -18,34 +18,54 @@ def wrap_tool(fn, *wrappers):
         fn = wrapper(fn)
     return fn
 
-def generate_fathom_params_from_query(query: str) -> dict:
-    """
-    Use an LLM to produce a params dict for fathom_list_meetings.
-    """
-    llm, cfg = get_llm(provider="openai", model="gpt-4o-mini")
-    prompt = f"""
-You are a parameter generator for the Fathom Meetings API.
-Given the user's request, output ONLY a JSON object for the 'params' argument to list_meetings().
+ALLOWED_PARAMS = {
+    "created_after",
+    "created_before",
+    "meeting_type",
+    "calendar_invitees",
+    "calendar_invitees_domains",
+    "include_summary",
+    "include_transcript",
+}
 
-Available params:
-- created_after (ISO datetime)
-- created_before (ISO datetime)
+def sanitize_fathom_params(llm_output: dict) -> dict:
+    if "params" not in llm_output or not isinstance(llm_output["params"], dict):
+        return {"params": {}}
+    params = {k: v for k, v in llm_output["params"].items() if k in ALLOWED_PARAMS}
+    return {"params": params}
+
+def fathom_param_generator(user_query: str) -> dict:
+    default_after = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00Z")
+    prompt = f"""
+You are a strict parameter generator for the Fathom Meetings API.
+
+Given the user's request, produce ONLY valid JSON with exactly one top-level key: "params".
+
+The "params" object may contain only:
+- created_after (ISO datetime string)
+- created_before (ISO datetime string)
 - meeting_type ("external" or "internal")
 - calendar_invitees (list of emails)
-- calendar_invitees_domains (list of email domains)
-- include_summary (bool)
-- include_transcript (bool)
+- calendar_invitees_domains (list of domains)
+- include_summary (boolean)
+- include_transcript (boolean)
 
-Only include the parameters relevant to the request. 
-User request: {query}
+If the request has no date range, default to:
+  {{"created_after": "{default_after}"}}
+
+If a parameter is not relevant, omit it.
+
+User request: {user_query}
 """
+
+    llm, cfg = get_llm(provider="openai", model="gpt-4o-mini")
     raw = llm.chat([{"role": "user", "content": prompt}],
                    model=cfg["model"], **cfg.get("params", {"temperature": 0}))
     try:
-        parsed = json.loads(str(raw).strip())
-        return parsed if isinstance(parsed, dict) else {}
+        parsed = json.loads(str(raw))
     except Exception:
-        return {}
+        parsed = {"params": {}}
+    return sanitize_fathom_params(parsed)
 
 def wrap_fathom_tool(fn, mode):
     """
@@ -63,9 +83,9 @@ def wrap_fathom_tool(fn, mode):
 
         params = args.get("params", {})
         if not params and qa:
-            params = generate_fathom_params_from_query(
-                getattr(qa, "query", None) or getattr(qa, "original_query", "") or str(qa)
-            )
+            params = fathom_param_generator(
+                getattr(qa, "raw_query", "") or getattr(qa, "original_query", "") or str(qa)
+            )["params"]
 
         # Default to last 14 days if no date range
         if "created_after" not in params:
@@ -102,13 +122,13 @@ def build_wrapped_catalog(is_metric_fn, mode="direct"):
             run = run  # gated by metric queries in its own wrapper elsewhere
 
         elif k == "fathom_list_meetings":
-            def fathom_wrapped(args, qa=None, _run=run):
-                # If query is not given, try generating params from raw query via LLM
-                if "query" not in args and qa is not None:
-                    query_text = getattr(qa, "raw_query", "")
-                    args = {**args, **generate_fathom_params_from_query(query_text)}
-                return _run(args)
-            run = fathom_wrapped
+            def run_with_llm(args, qa=None, _orig=v["run"]):
+                # If params are missing, try to generate them from raw query
+                if not args.get("params") and qa:
+                    args["params"] = fathom_param_generator(qa.raw_query)["params"]
+                return _orig(args)
+
+            run = run_with_llm
 
         elif k == "typesense_docs_live":
             run = wrap_tool(run, needs_ngrams)
