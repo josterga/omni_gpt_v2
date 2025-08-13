@@ -189,7 +189,7 @@ tool_catalog = {
         "name": "fathom_list_meetings",
         "description": (
             "List meeting records from the Fathom API. "
-            "Limit results to smallest set needed to answer the question."
+            "Limit results to smallest set needed to answer the question. "
         ),
         "produces": "json",
         "run": lambda args, qa=None: (lambda meetings: {

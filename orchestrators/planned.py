@@ -39,7 +39,7 @@ def make_lazy_artifacts(query: str) -> LazyQueryArtifacts:
 
 def run(query: str, *, allowed_tool_ids: list[str]):
     qa = make_lazy_artifacts(query)
-    catalog = build_wrapped_catalog(is_metric_query)
+    catalog = build_wrapped_catalog(is_metric_query, mode="planned")
 
     # Filter for planner
     filtered = {k: v for k, v in catalog.items() if k in allowed_tool_ids}

@@ -53,7 +53,7 @@ def make_lazy_artifacts(query: str) -> LazyQueryArtifacts:
 
 def run(query: str, *, allowed_tool_ids: list[str]):
     qa = make_lazy_artifacts(query)
-    catalog = build_wrapped_catalog(is_metric_query)
+    catalog = build_wrapped_catalog(is_metric_query, mode="direct")
 
     all_evidence, trace = [], {}
     for tool_id in allowed_tool_ids:
