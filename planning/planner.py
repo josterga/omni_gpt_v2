@@ -8,6 +8,8 @@ Decompose the user question into a sequence of tool calls whose combined outputs
 
 Rules:
 - Select only tools that materially contribute to the question.
+- Use ONLY tools from the "Available tools" list below — never invent new tool names.
+- Tool descriptions will contain detail about what data they can provide.
 - If a step depends on an earlier step's output, reference it with: {"$ref": "stepID.output[<jsonpath>]"}.
 - Keep arguments concrete and minimal.
 - Return ONLY a flat JSON array of steps. No commentary.
@@ -53,4 +55,6 @@ User question:
         assert isinstance(steps, list)
         for s in steps:
             assert "id" in s and "tool" in s and "args" in s
+            if s["tool"] not in tool_catalog:
+                raise ValueError(f"Planner selected unknown tool: {s['tool']}")
         return steps
