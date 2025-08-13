@@ -17,25 +17,16 @@ try:
     nltk.data.find("tokenizers/punkt_tab")
 except LookupError:
     nltk.download("punkt_tab")
-# Dev (monorepo) vs Prod (pip-installed) import shim
-try:
-    # Dev: monorepo namespace
-    from applied_ai.generation.generation.router import get_llm
-    from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExtractor
-    from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
-    from applied_ai.slack_search.slack_search.searcher import SlackSearcher
-    from applied_ai.mcp_client.mcp_client.registry import MCPRegistry
-    from applied_ai.retrieval.retrieval.faiss_retriever import FAISSRetriever
-    from applied_ai.chunking.chunking.pipeline import run_chunking
-except ImportError:
-    # Prod: packages installed from Git subdirectories (no namespace)
-    from generation.router import get_llm
-    from keyword_extractor.extractor import KeywordExtractor                # ← correct
-    from keyword_extractor.stopword_pruner import prune_stopwords_from_results
-    from slack_search.searcher import SlackSearcher
-    from retrieval.faiss_retriever import FAISSRetriever
-    from chunking.pipeline import run_chunking
-    from mcp_client.registry import MCPRegistry  
+# Use centralized import shims
+from import_shims import (
+    get_llm, 
+    KeywordExtractor, 
+    prune_stopwords_from_results,
+    SlackSearcher,
+    MCPRegistry,
+    run_chunking,
+    FAISSRetriever
+)  
 
 load_dotenv()
 
