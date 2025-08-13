@@ -6,7 +6,7 @@ from planning.executor import ToolExecutor
 from applied_ai.generation.generation.router import get_llm
 
 def test_planner_with_real_tools():
-    user_question = "Based on fathom - what are the most recent 3 meetings today?"
+    user_question = "what are the most recent 3 meetings today?"
 
     planner = ToolPlanner(get_llm)
     steps = planner.plan(user_question, tool_catalog)

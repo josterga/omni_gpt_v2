@@ -1,5 +1,5 @@
 import streamlit as st
-from app_core import handle_user_query
+from app_core import handle_query_planned
 
 import sys, os
 sys.path.insert(0, os.path.abspath("."))
@@ -28,7 +28,7 @@ if user_input:
     # Generate and display answer
     with st.chat_message("assistant"):
         with st.spinner("Searching..."):
-            answer, docs = handle_user_query(user_input)
+            answer, steps, trace, docs = handle_query_planned(user_input)
 
         # Format answer with optional sources
         st.markdown(f"**Response:**\n\n{answer}")
