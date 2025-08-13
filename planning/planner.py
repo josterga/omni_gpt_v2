@@ -47,14 +47,41 @@ Available tools:
 User question:
 {user_text}
 """
-        llm, cfg = self.llm_factory(provider="openai", model="gpt-4o-mini")
-        raw = llm.chat([{"role": "user", "content": prompt}],
-                       model=cfg["model"], **cfg.get("params", {"temperature": 0}))
-        txt = _strip_code_fences(str(raw))
-        steps = json.loads(txt)
-        assert isinstance(steps, list)
-        for s in steps:
-            assert "id" in s and "tool" in s and "args" in s
-            if s["tool"] not in tool_catalog:
-                raise ValueError(f"Planner selected unknown tool: {s['tool']}")
-        return steps
+        
+        try:
+            llm, cfg = self.llm_factory(provider="openai", model="gpt-4o-mini")
+            
+            # Check if LLM is available
+            if llm is None:
+                print("⚠️  LLM not available, using fallback planning")
+                return self._fallback_plan(user_text, tool_catalog)
+            
+            # Try to use the LLM for planning
+            raw = llm.chat([{"role": "user", "content": prompt}],
+                           model=cfg["model"], **cfg.get("params", {"temperature": 0}))
+            txt = _strip_code_fences(str(raw))
+            steps = json.loads(txt)
+            assert isinstance(steps, list)
+            for s in steps:
+                assert "id" in s and "tool" in s and "args" in s
+                if s["tool"] not in tool_catalog:
+                    raise ValueError(f"Planner selected unknown tool: {s['tool']}")
+            return steps
+            
+        except Exception as e:
+            print(f"⚠️  LLM planning failed: {e}, using fallback planning")
+            return self._fallback_plan(user_text, tool_catalog)
+    
+    def _fallback_plan(self, user_text: str, tool_catalog: ToolCatalog) -> List[PlanStep]:
+        """Fallback planning when LLM is not available."""
+        # Simple fallback: use the first available tool with basic args
+        available_tools = list(tool_catalog.keys())
+        if not available_tools:
+            return []
+        
+        # Create a simple plan with the first available tool
+        return [{
+            "id": "fallback_step",
+            "tool": available_tools[0],
+            "args": {"query": user_text}
+        }]

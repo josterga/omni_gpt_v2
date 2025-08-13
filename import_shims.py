@@ -14,20 +14,28 @@ Usage:
 # Generation module shims
 try:
     from applied_ai.generation.generation.router import get_llm
+    print("✅ Imported get_llm from applied_ai.generation.generation.router")
 except ImportError:
     try:
-        from generation.generation.router import get_llm
+        from generation.router import get_llm
+        print("✅ Imported get_llm from generation.router")
     except ImportError:
-        # Fallback for production deployment
-        def get_llm(provider="openai", model="gpt-4o-mini"):
-            raise ImportError("Generation module not available. Please install the generation package.")
+        try:
+            from applied_ai.generation.router import get_llm
+            print("✅ Imported get_llm from applied_ai.generation.router")
+        except ImportError:
+            # Fallback for production deployment - create a mock function
+            print("⚠️  Generation module not available, using fallback get_llm")
+            def get_llm(provider="openai", model="gpt-4o-mini"):
+                # Return a mock configuration that won't crash the app
+                return None, {"model": model, "params": {"temperature": 0}}
 
 # Keyword extraction module shims
 try:
     from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExtractor
 except ImportError:
     try:
-        from keyword_extraction.keyword_extractor.extractor import KeywordExtractor
+        from keyword_extractor.extractor import KeywordExtractor
     except ImportError:
         # Fallback class
         class KeywordExtractor:
@@ -40,7 +48,7 @@ try:
     from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
 except ImportError:
     try:
-        from keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
+        from keyword_extractor.stopword_pruner import prune_stopwords_from_results
     except ImportError:
         def prune_stopwords_from_results(results, stopwords, method):
             return results
@@ -50,7 +58,7 @@ try:
     from applied_ai.chunking.chunking.pipeline import run_chunking
 except ImportError:
     try:
-        from chunking.chunking.pipeline import run_chunking
+        from chunking.pipeline import run_chunking
     except ImportError:
         def run_chunking(*args, **kwargs):
             raise ImportError("Chunking module not available. Please install the chunking package.")
@@ -60,7 +68,7 @@ try:
     from applied_ai.slack_search.slack_search.searcher import SlackSearcher
 except ImportError:
     try:
-        from slack_search.slack_search.searcher import SlackSearcher
+        from slack_search.searcher import SlackSearcher
     except ImportError:
         # Fallback class
         class SlackSearcher:
@@ -76,7 +84,7 @@ try:
     from applied_ai.mcp_client.mcp_client.registry import MCPRegistry
 except ImportError:
     try:
-        from mcp_client.mcp_client.registry import MCPRegistry
+        from mcp_client.registry import MCPRegistry
     except ImportError:
         # Fallback class
         class MCPRegistry:
@@ -88,7 +96,7 @@ try:
     from applied_ai.retrieval.retrieval.faiss_retriever import FAISSRetriever
 except ImportError:
     try:
-        from retrieval.retrieval.faiss_retriever import FAISSRetriever
+        from retrieval.faiss_retriever import FAISSRetriever
     except ImportError:
         # Fallback class
         class FAISSRetriever:
