@@ -1,6 +1,6 @@
 # synthesis.py
 from typing import List, Dict, Any
-from applied_ai.generation.generation.router import get_llm
+from import_shims import get_llm
 
 def synthesize_answer(query: str,
                       docs: List[Dict[str, Any]],

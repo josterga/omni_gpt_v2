@@ -5,7 +5,7 @@ from tooling.decorators import (
     with_slack_exclusions,
     gated_by_is_metric,
 )
-from applied_ai.generation.generation.router import get_llm
+from import_shims import get_llm
 import json
 from datetime import datetime, timedelta
 

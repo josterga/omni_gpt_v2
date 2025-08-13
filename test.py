@@ -3,7 +3,7 @@ import json
 from planning.catalog import tool_catalog
 from planning.planner import ToolPlanner
 from planning.executor import ToolExecutor
-from applied_ai.generation.generation.router import get_llm
+from import_shims import get_llm
 
 def test_planner_with_real_tools():
     user_question = "what are the most recent 3 meetings today?"

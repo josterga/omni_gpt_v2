@@ -9,6 +9,10 @@ openai>=1.40,<2
 slack-sdk>=3.27,<4
 faiss-cpu>=1.8.0,<2
 
+# New dependencies for fathom-module branch
+httpx>=0.25,<1
+nltk>=3.8,<4
+
 # applied-ai monorepo packages (branch: omni_gpt)
 git+https://github.com/josterga/applied-ai@omni_gpt#subdirectory=chunking
 git+https://github.com/josterga/applied-ai@omni_gpt#subdirectory=retrieval

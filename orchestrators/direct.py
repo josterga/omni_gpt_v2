@@ -2,9 +2,7 @@ from planning.catalog_wrapped import build_wrapped_catalog
 from tooling.query_artifacts import LazyQueryArtifacts
 from evidence import flatten_for_synth
 from synthesis import synthesize_answer
-from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExtractor
-from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
-from applied_ai.chunking.chunking.pipeline import run_chunking
+from import_shims import KeywordExtractor, prune_stopwords_from_results, run_chunking
 from app_core import is_metric_query
 
 ngram_config = {

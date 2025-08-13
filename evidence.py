@@ -61,7 +61,7 @@ def flatten_for_synth(
                         if isinstance(summary_data, dict):
                             summary_text = summary_data.get("markdown_formatted") or summary_data.get("text") or ""
                         if summary_text:
-                            summary_text = summary_text.strip().replace("\n", " ")[:700] + "..."  # trim
+                            summary_text = summary_text.strip().replace("\n", " ")[:300] + "..."  # trim
 
                         actions_data = m.get("action_items") or []
                         action_texts = []

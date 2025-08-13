@@ -3,11 +3,8 @@ from planning.planner import ToolPlanner
 from planning.executor import ToolExecutor
 from planning.catalog_wrapped import build_wrapped_catalog
 from tooling.query_artifacts import LazyQueryArtifacts
-from applied_ai.keyword_extraction.keyword_extractor.extractor import KeywordExtractor
-from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
-from applied_ai.chunking.chunking.pipeline import run_chunking
+from import_shims import KeywordExtractor, prune_stopwords_from_results, run_chunking, get_llm
 from app_core import is_metric_query, ngram_config
-from applied_ai.generation.generation.router import get_llm
 from evidence import flatten_for_synth  # <-- import the unified flattener
 from synthesis import synthesize_answer
 

@@ -2,16 +2,8 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any
 
-# Monorepo or prod import shim
-try:
-    from applied_ai.slack_search.slack_search.searcher import SlackSearcher
-    from applied_ai.chunking.chunking.pipeline import run_chunking
-    from applied_ai.mcp_client.mcp_client.registry import MCPRegistry
-
-except ImportError:
-    from slack_search.searcher import SlackSearcher
-    from chunking.pipeline import run_chunking
-    from mcp_client.registry import MCPRegistry
+# Use centralized import shims
+from import_shims import SlackSearcher, run_chunking, MCPRegistry
 
 
 from app_core import load_json_embeddings, search_json_chunks
