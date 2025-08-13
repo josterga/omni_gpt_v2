@@ -1,7 +1,5 @@
 # main.py (your Streamlit app)
 import streamlit as st
-from planning.catalog import tool_catalog
-from app_modes import run_query
 
 st.set_page_config(page_title="Omni-GPT", layout="centered")
 st.title("Omni-GPT")
@@ -10,10 +8,33 @@ st.title("Omni-GPT")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+def get_tool_catalog():
+    """Get tool catalog - imported here to avoid circular imports."""
+    try:
+        from planning.catalog import tool_catalog
+        return tool_catalog
+    except ImportError as e:
+        st.error(f"Failed to import tool catalog: {e}")
+        return {}
+
+def get_run_query():
+    """Get run_query function - imported here to avoid circular imports."""
+    try:
+        from app_modes import run_query
+        return run_query
+    except ImportError as e:
+        st.error(f"Failed to import run_query: {e}")
+        return lambda mode, query, tools: ("Error: Import failed", [], {}, [])
+
 # UI controls
 mode = st.radio("Mode", ["search", "planned"], index=0, horizontal=True)
+
+# Get tool catalog and run_query function
+tool_catalog = get_tool_catalog()
+run_query = get_run_query()
+
 # Show only human-facing names if you want; here we use IDs
-tool_ids = list(tool_catalog.keys())
+tool_ids = list(tool_catalog.keys()) if tool_catalog else []
 selected_tools = st.multiselect("Tools", tool_ids, default=[tid for tid in tool_ids if tid != "typesense_search"])
 
 # Chat history

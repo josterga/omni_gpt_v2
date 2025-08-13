@@ -26,7 +26,7 @@ from import_shims import (
     MCPRegistry,
     run_chunking,
     FAISSRetriever
-)  
+)
 
 load_dotenv()
 
@@ -37,7 +37,12 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() in {"1", "true", "yes"}
 SLACK_TOKEN = os.getenv("SLACK_API_KEY")
-slack_searcher = SlackSearcher(slack_token=SLACK_TOKEN, result_limit=3, thread_limit=5)
+
+# Initialize SlackSearcher only if the module is available
+if SlackSearcher is not None:
+    slack_searcher = SlackSearcher(slack_token=SLACK_TOKEN, result_limit=3, thread_limit=5)
+else:
+    slack_searcher = None
 TYPESENSE_API_KEY = os.getenv('TYPESENSE_API_KEY')
 TYPESENSE_BASE_URL = os.getenv('TYPESENSE_BASE_URL')
 TYPESENSE_URL = f"https://{TYPESENSE_BASE_URL}-1.a1.typesense.net/multi_search?x-typesense-api-key={TYPESENSE_API_KEY}"
@@ -226,21 +231,24 @@ def handle_user_query(query):
     seen = set()
     slack_ngrams = ngrams.get("ngram") if isinstance(ngrams, dict) else ngrams
     search_excluded = " -in:customer-sla-breach -in:customer-triage -in:support-overflow -in:omnis -in:customer-membership-alerts -in:vector-alerts -in:notifications-alerts -cypress -github -sentry -squadcast -syften -in:leadership -in:leaders"
-    for ng in slack_ngrams:
-        for res in slack_searcher.search(ng+search_excluded):
-            channel_name = res.get("metadata", {}).get("channel_name") or res.get("metadata", {}).get("channel")
-            text = res.get("text", "") if isinstance(res, dict) else res
-            url = res.get("metadata", {}).get("permalink", "") if isinstance(res, dict) else ""
-            key = url or text
-            if key in seen:
-                continue
-            seen.add(key)
-            slack_docs.append({
-                "title": f"Slack – #{channel_name}" if channel_name else "Slack",
-                "url": url,
-                "content": text,
-                "source": "slack"
-            })
+    if slack_searcher:
+        for ng in slack_ngrams:
+            for res in slack_searcher.search(ng+search_excluded):
+                channel_name = res.get("metadata", {}).get("channel_name") or res.get("metadata", {}).get("channel")
+                text = res.get("text", "") if isinstance(res, dict) else res
+                url = res.get("metadata", {}).get("permalink", "") if isinstance(res, dict) else ""
+                key = url or text
+                if key in seen:
+                    continue
+                seen.add(key)
+                slack_docs.append({
+                    "title": f"Slack – #{channel_name}" if channel_name else "Slack",
+                    "url": url,
+                    "content": text,
+                    "source": "slack"
+                })
+    else:
+        print("SlackSearcher module not available, skipping Slack search.")
 
     docs_chunks = load_json_embeddings(Path("sources/docs/docs-000.jsonl"))
     community_chunks = load_json_embeddings(Path("sources/discourse/discourse-000.jsonl"))

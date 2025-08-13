@@ -29,7 +29,12 @@ except ImportError:
     try:
         from keyword_extraction.keyword_extractor.extractor import KeywordExtractor
     except ImportError:
-        KeywordExtractor = None
+        # Fallback class
+        class KeywordExtractor:
+            def __init__(self, config):
+                self.config = config
+            def extract(self, text):
+                return {"ngram": []}
 
 try:
     from applied_ai.keyword_extraction.keyword_extractor.stopword_pruner import prune_stopwords_from_results
@@ -57,7 +62,14 @@ except ImportError:
     try:
         from slack_search.slack_search.searcher import SlackSearcher
     except ImportError:
-        SlackSearcher = None
+        # Fallback class
+        class SlackSearcher:
+            def __init__(self, slack_token=None, result_limit=3, thread_limit=5):
+                self.slack_token = slack_token
+                self.result_limit = result_limit
+                self.thread_limit = thread_limit
+            def search(self, query):
+                return []
 
 # MCP client module shims
 try:
@@ -66,7 +78,10 @@ except ImportError:
     try:
         from mcp_client.mcp_client.registry import MCPRegistry
     except ImportError:
-        MCPRegistry = None
+        # Fallback class
+        class MCPRegistry:
+            def get_client(self, *args, **kwargs):
+                return None
 
 # Retrieval module shims
 try:
@@ -75,7 +90,10 @@ except ImportError:
     try:
         from retrieval.retrieval.faiss_retriever import FAISSRetriever
     except ImportError:
-        FAISSRetriever = None
+        # Fallback class
+        class FAISSRetriever:
+            def __init__(self, *args, **kwargs):
+                pass
 
 # Validation function to check if all required modules are available
 def validate_imports():
