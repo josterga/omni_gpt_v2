@@ -1,12 +1,14 @@
 # main.py (your Streamlit app)
 import streamlit as st
 
-st.set_page_config(page_title="Omni-GPT", layout="centered")
+st.set_page_config(page_title="Omni-GPT", layout="wide")  # Wide layout for sidebar
 st.title("Omni-GPT")
 
 # Initialize state
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "selected_tools" not in st.session_state:
+    st.session_state.selected_tools = []
 
 def get_tool_catalog():
     """Get tool catalog - imported here to avoid circular imports."""
@@ -23,10 +25,20 @@ def get_run_query():
         from app_modes import run_query
         return run_query
     except ImportError as e:
-        st.error(f"Failed to import run_query: {e}")
+        st.error(f"Import failed: {e}")
         return lambda mode, query, tools: ("Error: Import failed", [], {}, [])
 
-# UI controls
+# Get tool catalog and run_query function
+tool_catalog = get_tool_catalog()
+run_query = get_run_query()
+
+# Default tools for each mode
+default_tools = {
+    "search": ["slack_search", "docs_embed_search", "community_embed_search"],
+    "planned": ["slack_search", "docs_embed_search", "community_embed_search", "mcp_query", "fathom_list_meetings"]
+}
+
+# Mode selection (before tool selection to set defaults)
 mode = st.radio(
     "Mode", 
     ["search", "planned"], 
@@ -34,24 +46,42 @@ mode = st.radio(
     horizontal=True,
     help=(
         "**Search:**\n"
-        "- Runs a fixed set of tools in parallel on your query.\n"
-        "- MCP is only used for metric-related queries (e.g., analytics, quantitative data).\n"
-        "- Fathom is not supported in Search mode.\n"
-        "- Best for fast answers to straightforward questions.\n\n"
-        "**Planned:**\n"
-        "- Uses an AI planner to dynamically select and sequence tools for your query.\n"
-        "- Best for complex or multi-step questions where optimal tool selection is important.\n"
-        "- Uses gpt-5 with larger context window.\n"
+        "- Direct search across selected sources.\n"
+        "- Note: Fathom is only supported in Planned mode. MCP in Search mode is only invoked by metric queries (how many, total, etc.) \n"
+         "**Planned:**\n"
+        "- LLM-orchestrated multi-tool search.\n"
+        "- Uses gpt-5 with increased context window\n\n"
     )
 )
 
-# Get tool catalog and run_query function
-tool_catalog = get_tool_catalog()
-run_query = get_run_query()
+# Update default selection when mode changes
+if "current_mode" not in st.session_state or st.session_state.current_mode != mode:
+    st.session_state.current_mode = mode
+    st.session_state.selected_tools = default_tools.get(mode, [])
 
-# Show only human-facing names if you want; here we use IDs
-tool_ids = list(tool_catalog.keys()) if tool_catalog else []
-selected_tools = st.multiselect("Tools", tool_ids, default=[tid for tid in tool_ids if tid != "typesense_search"])
+# Sidebar tool selection using the new UI components
+try:
+    from tooling.ui_components import get_tool_selection_widget
+    
+    # Get selected tools from sidebar (only called once)
+    selected_tools = get_tool_selection_widget(
+        default_selection=st.session_state.selected_tools,
+        key_prefix="main"
+    )
+    
+    # Update session state with current selection
+    st.session_state.selected_tools = selected_tools
+    
+except ImportError as e:
+    st.sidebar.error(f"Failed to load tool selection UI: {e}")
+    # Fallback to simple multiselect
+    tool_ids = list(tool_catalog.keys()) if tool_catalog else []
+    selected_tools = st.sidebar.multiselect(
+        "Tools (Fallback)", 
+        tool_ids, 
+        default=st.session_state.selected_tools
+    )
+    st.session_state.selected_tools = selected_tools
 
 # Chat history
 for msg in st.session_state.messages:
@@ -82,3 +112,4 @@ if user_input:
                     st.markdown(f"- **{d['title']}** {link}")
 
     st.session_state.messages.append({"role": "assistant", "content": f"**Answer:**\n\n{answer}"})
+

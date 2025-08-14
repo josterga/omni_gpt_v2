@@ -90,7 +90,8 @@ SLACK_TOKEN = os.getenv("SLACK_API_KEY")
 tool_catalog = {
     # Slack search (works with needs_ngrams + with_slack_exclusions)
     "slack_search": {
-        "name": "slack_search",
+        "name": "Slack",
+        "category": "Communication",
         "description": "Search Slack messages/threads and return relevant snippets. Great for discussions, recent decisions, feature updates, niche workflows, tribal knowledge, and ephemeral fixes. You can include filters for in:#<channel> in the query. Every customer has their own channel using omni-<customer> as the name. Internal product feature-related channels: ai, ai-development, api, backend, calcs, dashboards, dbt, disco-stew, docs, drafts-branches, embed, eng, event-loop-lag, it-help, modeling, omni-omni-analytics, product, product-promise-requests, proj-ai-docs, proj-csv-upload, scheduled-deliveries-and-alerts,  spreadsheets, ux, visualizations. Sales/Marketing-related channels: sales, marketing, closed-lost-notifications, sigma-compete, optys-qual-hall.",
         "produces": "docs",
         "run": lambda args, qa=None: {
@@ -112,29 +113,10 @@ tool_catalog = {
         }
     },
 
-    # Typesense keyword search (uses ngrams; fetches live content for top results)
-    "typesense_search": {
-        "name": "typesense_search",
-        "description": "Fast keyword-based search over live Omni Docs. Returns grouped, deduped results with live content fetch for better snippets.",
-        "produces": "docs",
-        "run": lambda args, qa=None: (lambda docs: {
-            "kind": "docs",
-            "value": [
-                {
-                    "text": d.get("content", ""),
-                    "title": d.get("title"),
-                    "url": d.get("url"),
-                    "source": "typesense",
-                }
-                for d in docs
-            ],
-            "preview": f"typesense:{args.get('query','')[:60]}"
-        })(search_typesense_ngrams(args.get("ngrams", []), max_results=args.get("limit", 5)))
-    },
-
     # Docs embedding search
     "docs_embed_search": {
-        "name": "docs_embed_search",
+        "name": "Docs-semantic",
+        "category": "Documentation",
         "description": "Semantic search over embedded Omni Docs JSON chunks. Best for official processes, product architecture and features, deployment guides.",
         "produces": "docs",
         "run": lambda args, qa=None: {
@@ -152,7 +134,8 @@ tool_catalog = {
 
     # Community embedding search
     "community_embed_search": {
-        "name": "community_embed_search",
+        "name": "Community-semantic",
+        "category": "Documentation",
         "description": "Semantic search over embedded Community (Discourse) JSON chunks. Contains articles covering best practices, how-tos, common patterns and workflows.",
         "produces": "docs",
         "run": lambda args, qa=None: {
@@ -168,9 +151,31 @@ tool_catalog = {
         },
     },
 
+    # Typesense keyword search (uses ngrams; fetches live content for top results)
+    "typesense_search": {
+        "name": "Docs websearch",
+        "category": "Documentation",
+        "description": "Fast keyword-based realtime search over live Omni Docs. Returns grouped, deduped results with live content fetch for better snippets.",
+        "produces": "docs",
+        "run": lambda args, qa=None: (lambda docs: {
+            "kind": "docs",
+            "value": [
+                {
+                    "text": d.get("content", ""),
+                    "title": d.get("title"),
+                    "url": d.get("url"),
+                    "source": "typesense",
+                }
+                for d in docs
+            ],
+            "preview": f"typesense:{args.get('query','')[:60]}"
+        })(search_typesense_ngrams(args.get("ngrams", []), max_results=args.get("limit", 5)))
+    },
+
     # MCP query
     "mcp_query": {
-        "name": "mcp_query",
+        "name": "MCP (omni.omniapp.co)",
+        "category": "Data & Analytics",
         "description": "Ask MCP for a synthesized answer w/ reasoning. MCP queries are passed to a LLM which generates a SQL query against the database for a particular topic. Topics are selected by the MCP server. Data may include: Github (github issues may contain product feature requests and bugs to help answer product questions), Salesforce (Accounts, Opportunities, Contacts, Domains), Product Usage Data (Organizations, Users, Queries, Models, Features), Customer Support Data (Pylon).",
         "produces": "text",
         "run": lambda args, qa=None: (
@@ -199,6 +204,7 @@ tool_catalog = {
     # Fathom meetings
     "fathom_list_meetings": {
         "name": "fathom_list_meetings",
+        "category": "Communication",
         "description": (
             "List meeting records from the Fathom API."
             "Limit results to smallest set needed to answer the question. "
@@ -211,3 +217,44 @@ tool_catalog = {
         })(list(fathom_api.list_meetings(params=args.get("params", {}))))
     }
 }
+
+# === Tool Categories for UI Organization ===
+TOOL_CATEGORIES = {
+    "Documentation": [
+        "typesense_search",
+        "docs_embed_search", 
+        "community_embed_search"
+    ],
+    "Communication": [
+        "slack_search",
+        "fathom_list_meetings"
+    ],
+    "Data & Analytics": [
+        "mcp_query"
+    ]
+}
+
+# === Utility Functions for UI ===
+def get_tools_by_category():
+    """Returns tools organized by category for UI display."""
+    categorized = {}
+    for category, tool_ids in TOOL_CATEGORIES.items():
+        categorized[category] = {
+            tool_id: tool_catalog[tool_id] 
+            for tool_id in tool_ids 
+            if tool_id in tool_catalog
+        }
+    return categorized
+
+def get_tool_display_info():
+    """Returns tool information formatted for UI display."""
+    display_info = {}
+    for tool_id, tool in tool_catalog.items():
+        display_info[tool_id] = {
+            "id": tool_id,
+            "name": tool.get("name", tool_id),
+            "category": tool.get("category", "Uncategorized"),
+            "description": tool.get("description", ""),
+            "produces": tool.get("produces", "unknown")
+        }
+    return display_info
