@@ -8,7 +8,7 @@ Decompose the user question into a sequence of tool calls whose combined outputs
 
 Rules:
 - Select only tools that materially contribute to the question.
-- Use ONLY tools from the "Available tools" list below — never invent new tool names.
+- Use only the tool IDs exactly as given in the list below when specifying which tool to use.
 - Tool descriptions will contain detail about what data they can provide.
 - If a step depends on an earlier step's output, reference it with: {"$ref": "stepID.output[<jsonpath>]"}.
 - Keep arguments concrete and minimal.
@@ -37,7 +37,8 @@ class ToolPlanner:
 
     def plan(self, user_text: str, tool_catalog: ToolCatalog) -> List[PlanStep]:
         tool_descriptions = "\n".join(
-            f"- {spec['name']}: {spec['description']}" for spec in tool_catalog.values()
+            f"- {tool_id} ({spec['name']}): {spec['description']}"
+            for tool_id, spec in tool_catalog.items()
         )
         prompt = f"""{PLANNER_PROMPT}
 
