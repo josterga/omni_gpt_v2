@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 SLACK_EXCLUSIONS = (
     " -in:customer-sla-breach -in:customer-triage -in:support-overflow "
     "-in:omnis -in:customer-membership-alerts -in:vector-alerts -in:notifications-alerts "
-    "-cypress -github -sentry -squadcast -syften -in:leadership -in:leaders"
+    "-cypress -github -sentry -squadcast -syften -in:leadership -in:leaders -in:legal-review"
 )
 
 def make_docs_url_from_path(raw_path: str) -> str:
