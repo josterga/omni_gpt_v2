@@ -32,7 +32,17 @@ mode = st.radio(
     ["search", "planned"], 
     index=0, 
     horizontal=True,
-    help="Search: Direct tool execution | Planned: Multi-tool orchestration"
+    help=(
+        "**Search:**\n"
+        "- Runs a fixed set of tools in parallel on your query.\n"
+        "- MCP is only used for metric-related queries (e.g., analytics, quantitative data).\n"
+        "- Fathom is not supported in Search mode.\n"
+        "- Best for fast answers to straightforward questions.\n\n"
+        "**Planned:**\n"
+        "- Uses an AI planner to dynamically select and sequence tools for your query.\n"
+        "- Best for complex or multi-step questions where optimal tool selection is important.\n"
+        "- Uses gpt-5 with larger context window.\n"
+    )
 )
 
 # Get tool catalog and run_query function

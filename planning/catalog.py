@@ -151,7 +151,7 @@ tool_catalog = {
     # MCP query
     "mcp_query": {
         "name": "mcp_query",
-        "description": "Ask MCP for a synthesized answer w/ reasoning. MCP queries are passed to a LLM which generates a SQL query against the database for a particular topic. Topics are selected by the MCP server. Data may include: Github, Salesforce (Accounts, Opportunities, Contacts, Domains), Product Usage Data (Organizations, Users, Queries, Models, Features), Customer Support Data (Pylon).",
+        "description": "Ask MCP for a synthesized answer w/ reasoning. MCP queries are passed to a LLM which generates a SQL query against the database for a particular topic. Topics are selected by the MCP server. Data may include: Github (github issues may contain product feature requests and bugs to help answer product questions), Salesforce (Accounts, Opportunities, Contacts, Domains), Product Usage Data (Organizations, Users, Queries, Models, Features), Customer Support Data (Pylon).",
         "produces": "text",
         "run": lambda args, qa=None: (
         lambda query_text: (

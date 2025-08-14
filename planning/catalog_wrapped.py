@@ -107,7 +107,20 @@ def build_wrapped_catalog(is_metric_fn, mode="direct"):
             run = wrap_tool(run, needs_embedding)
 
         elif k == "mcp_query":
-            run = run  # gated by metric queries in its own wrapper elsewhere
+            if mode == "direct":
+                # Only gate MCP in direct mode
+                def gated_by_is_metric(run, is_metric_fn):
+                    def wrapped(args, qa=None):
+                        query = args.get("query") or args.get("question") or ""
+                        if not is_metric_fn(query):
+                            return {
+                                "kind": "error",
+                                "value": "MCP is only available for metric queries.",
+                                "source": "mcp_query"
+                            }
+                        return run(args, qa=qa)
+                    return wrapped
+                run = gated_by_is_metric(run, is_metric_fn)
 
         elif k == "fathom_list_meetings":
             def run_with_llm(args, qa=None, _orig=v["run"]):
