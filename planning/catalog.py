@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from import_shims import SlackSearcher, run_chunking, MCPRegistry
 
 
-from app_core import load_json_embeddings, search_json_chunks
+from app_core import load_json_embeddings, search_json_chunks, search_typesense_ngrams
 from tooling.common_utils import make_docs_url_from_path, make_community_url
 from fathom_module import fathom_api
 from openai import OpenAI
@@ -110,6 +110,26 @@ tool_catalog = {
             ],
             "preview": f"slack:{args.get('query','')[:60]}"
         }
+    },
+
+    # Typesense keyword search (uses ngrams; fetches live content for top results)
+    "typesense_search": {
+        "name": "typesense_search",
+        "description": "Fast keyword-based search over live Omni Docs. Returns grouped, deduped results with live content fetch for better snippets.",
+        "produces": "docs",
+        "run": lambda args, qa=None: (lambda docs: {
+            "kind": "docs",
+            "value": [
+                {
+                    "text": d.get("content", ""),
+                    "title": d.get("title"),
+                    "url": d.get("url"),
+                    "source": "typesense",
+                }
+                for d in docs
+            ],
+            "preview": f"typesense:{args.get('query','')[:60]}"
+        })(search_typesense_ngrams(args.get("ngrams", []), max_results=args.get("limit", 5)))
     },
 
     # Docs embedding search
