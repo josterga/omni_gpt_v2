@@ -153,7 +153,7 @@ tool_catalog = {
 
     # Typesense keyword search (uses ngrams; fetches live content for top results)
     "typesense_search": {
-        "name": "Docs websearch",
+        "name": "docs.omni.co websearch",
         "category": "Documentation",
         "description": "Fast keyword-based realtime search over live Omni Docs. Returns grouped, deduped results with live content fetch for better snippets.",
         "produces": "docs",

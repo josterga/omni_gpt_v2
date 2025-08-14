@@ -49,7 +49,7 @@ with col2:
     lite_mode = st.toggle(
         "🚀 Lite Mode", 
         value=st.session_state.lite_mode,
-        help="Quick setup: Typesense search only. Toggle off to return to normal mode selection."
+        help="LLM powered docs.omni.co search."
     )
     
     # Handle lite mode toggle changes
@@ -79,7 +79,7 @@ else:
         help=(
             "**Search:**\n"
             "- Direct search across selected sources.\n"
-            "- Note: Fathom is only supported in Planned mode. MCP in Search mode is only invoked by metric queries (how many, total, etc.) \n"
+            "- Note: Fathom is only supported in Planned mode. MCP in Search mode is only invoked by metric queries (how many, total, etc.) \n\n"
              "**Planned:**\n"
             "- LLM-orchestrated multi-tool search.\n"
             "- Uses gpt-5 with increased context window\n\n"
