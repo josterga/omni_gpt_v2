@@ -9,6 +9,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "selected_tools" not in st.session_state:
     st.session_state.selected_tools = []
+if "lite_mode" not in st.session_state:
+    st.session_state.lite_mode = False
 
 def get_tool_catalog():
     """Get tool catalog - imported here to avoid circular imports."""
@@ -38,24 +40,54 @@ default_tools = {
     "planned": ["slack_search", "docs_embed_search", "community_embed_search", "mcp_query", "fathom_list_meetings"]
 }
 
-# Mode selection (before tool selection to set defaults)
-mode = st.radio(
-    "Mode", 
-    ["search", "planned"], 
-    index=0, 
-    horizontal=True,
-    help=(
-        "**Search:**\n"
-        "- Direct search across selected sources.\n"
-        "- Note: Fathom is only supported in Planned mode. MCP in Search mode is only invoked by metric queries (how many, total, etc.) \n"
-         "**Planned:**\n"
-        "- LLM-orchestrated multi-tool search.\n"
-        "- Uses gpt-5 with increased context window\n\n"
+# Lite Mode toggle - automatically configures typesense_search + search mode
+# This needs to be before mode selection to properly override
+col1, col2 = st.columns([3, 1])
+with col1:
+    st.write("")  # Spacer for alignment
+with col2:
+    lite_mode = st.toggle(
+        "🚀 Lite Mode", 
+        value=st.session_state.lite_mode,
+        help="Quick setup: Typesense search only. Toggle off to return to normal mode selection."
     )
-)
+    
+    # Handle lite mode toggle changes
+    if lite_mode != st.session_state.lite_mode:
+        st.session_state.lite_mode = lite_mode
+        if lite_mode:
+            # Lite mode ON: set to search + typesense
+            st.session_state.current_mode = "search"
+            st.session_state.selected_tools = ["typesense_search"]
+        else:
+            # Lite mode OFF: reset to default for current mode
+            current_mode = st.session_state.get("current_mode", "search")
+            st.session_state.selected_tools = default_tools.get(current_mode, [])
+        st.rerun()
 
-# Update default selection when mode changes
-if "current_mode" not in st.session_state or st.session_state.current_mode != mode:
+# Mode selection (after lite mode toggle to allow override)
+if st.session_state.lite_mode:
+    # Lite mode is ON: force search mode
+    mode = "search"
+else:
+    # Lite mode is OFF: allow normal mode selection
+    mode = st.radio(
+        "Mode", 
+        ["search", "planned"], 
+        index=0, 
+        horizontal=True,
+        help=(
+            "**Search:**\n"
+            "- Direct search across selected sources.\n"
+            "- Note: Fathom is only supported in Planned mode. MCP in Search mode is only invoked by metric queries (how many, total, etc.) \n"
+             "**Planned:**\n"
+            "- LLM-orchestrated multi-tool search.\n"
+            "- Uses gpt-5 with increased context window\n\n"
+        )
+    )
+
+# Update default selection when mode changes (only when not in lite mode)
+if not st.session_state.lite_mode and ("current_mode" not in st.session_state or st.session_state.current_mode != mode):
     st.session_state.current_mode = mode
     st.session_state.selected_tools = default_tools.get(mode, [])
 
@@ -63,7 +95,7 @@ if "current_mode" not in st.session_state or st.session_state.current_mode != mo
 try:
     from tooling.ui_components import get_tool_selection_widget
     
-    # Get selected tools from sidebar (only called once)
+    # Get selected tools from sidebar
     selected_tools = get_tool_selection_widget(
         default_selection=st.session_state.selected_tools,
         key_prefix="main"

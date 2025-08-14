@@ -203,7 +203,7 @@ tool_catalog = {
 
     # Fathom meetings
     "fathom_list_meetings": {
-        "name": "fathom_list_meetings",
+        "name": "Fathom meetings",
         "category": "Communication",
         "description": (
             "List meeting records from the Fathom API."
